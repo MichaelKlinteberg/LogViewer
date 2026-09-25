@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:LogViewer.App"
         mc:Ignorable="d"
         Title="LogViewer" Height="700" Width="1200"
+        Icon="Resources/AppIcon.ico"
         AllowDrop="True" Drop="Window_Drop" DragOver="Window_DragOver">
     <DockPanel>
         <ToolBar DockPanel.Dock="Top">

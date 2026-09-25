@@ -1,5 +1,6 @@
 using System.Text;
 using LogViewer.Core.IO;
+using LogViewer.Core.Records;
 using Xunit;
 
 namespace LogViewer.Core.Tests;
@@ -95,6 +96,85 @@ public class LogFileIndexTests : IDisposable
         Assert.NotNull(records[1].CmTrace);
         Assert.Equal("19068", records[1].CmTrace!.Thread);
         Assert.Equal("Submitted request successfully", records[1].CmTrace!.Message);
+    }
+
+    [Fact]
+    public void Detects_mixed_cmtrace_variants_and_parses_each_record_by_its_own_variant()
+    {
+        var path = NewPath("mixed-cmtrace.log");
+        // A file that genuinely mixes both first-class CMTrace variants record-by-record (e.g. a
+        // component that switched logging style mid-file, or two different tools writing to the same
+        // log). Both variants must be detected and parsed with equal priority, per record - neither is
+        // a "legacy fallback" of the other.
+        var content =
+            "<![LOG[XML-style message]LOG]!><time=\"10:00:00.000+0\" date=\"01-01-2026\" component=\"CompA\" context=\"\" type=\"2\" thread=\"111\" file=\"f\">\r\n" +
+            "Trailing-metadata message  $$<CompB><09-25-2026 15:13:55.938-60><thread=222 (0xDE)>\r\n" +
+            "<![LOG[Another XML message]LOG]!><time=\"10:00:01.000+0\" date=\"01-01-2026\" component=\"CompC\" context=\"\" type=\"1\" thread=\"333\" file=\"f\">\r\n";
+        File.WriteAllText(path, content, new UTF8Encoding(false));
+
+        var index = new LogFileIndex(path);
+        index.Refresh();
+
+        Assert.Equal(LogFormat.CmTraceMixed, index.Format);
+        Assert.Equal(3, index.TotalRecordCount);
+
+        var records = index.GetRecords(0, 3);
+
+        Assert.NotNull(records[0].CmTrace);
+        Assert.Equal("CompA", records[0].CmTrace!.Component);
+        Assert.Equal(LogSeverity.Warning, records[0].CmTrace!.Severity);
+        Assert.Equal("XML-style message", records[0].CmTrace!.Message);
+
+        Assert.NotNull(records[1].CmTrace);
+        Assert.Equal("CompB", records[1].CmTrace!.Component);
+        Assert.Equal("222", records[1].CmTrace!.Thread);
+        Assert.Equal("Trailing-metadata message", records[1].CmTrace!.Message);
+
+        Assert.NotNull(records[2].CmTrace);
+        Assert.Equal("CompC", records[2].CmTrace!.Component);
+        Assert.Equal(LogSeverity.Info, records[2].CmTrace!.Severity);
+        Assert.Equal("Another XML message", records[2].CmTrace!.Message);
+    }
+
+    [Fact]
+    public void A_pure_legacy_cmtrace_file_is_parsed_with_the_same_correctness_as_a_pure_xml_cmtrace_file()
+    {
+        // Equal-priority regression guard: the trailing-metadata variant is an actively-used, current
+        // real-world SCCM/ConfigMgr format (not a deprecated/secondary one) and must be fully supported
+        // on its own, exactly like the XML-attribute variant already is.
+        var xmlPath = NewPath("pure-xml.log");
+        File.WriteAllText(
+            xmlPath,
+            "<![LOG[Msg one]LOG]!><time=\"10:00:00.000+0\" date=\"01-01-2026\" component=\"A\" context=\"\" type=\"1\" thread=\"1\" file=\"f\">\r\n" +
+            "<![LOG[Msg two]LOG]!><time=\"10:00:01.000+0\" date=\"01-01-2026\" component=\"B\" context=\"\" type=\"3\" thread=\"2\" file=\"f\">\r\n",
+            new UTF8Encoding(false));
+
+        var legacyPath = NewPath("pure-legacy.log");
+        File.WriteAllText(
+            legacyPath,
+            "Msg one  $$<A><01-01-2026 10:00:00.000-0><thread=1 (0x1)>\r\n" +
+            "Msg two  $$<B><01-01-2026 10:00:01.000-0><thread=2 (0x2)>\r\n",
+            new UTF8Encoding(false));
+
+        var xmlIndex = new LogFileIndex(xmlPath);
+        xmlIndex.Refresh();
+        var legacyIndex = new LogFileIndex(legacyPath);
+        legacyIndex.Refresh();
+
+        Assert.Equal(LogFormat.CmTrace, xmlIndex.Format);
+        Assert.Equal(LogFormat.CmTraceLegacy, legacyIndex.Format);
+
+        var xmlRecords = xmlIndex.GetRecords(0, 2);
+        var legacyRecords = legacyIndex.GetRecords(0, 2);
+
+        // Both variants correctly extract Component/Message for every record; the legacy variant has
+        // no severity field (defaults to Info) while the XML variant's explicit type="3" is honored.
+        Assert.Equal("A", xmlRecords[0].CmTrace!.Component);
+        Assert.Equal("A", legacyRecords[0].CmTrace!.Component);
+        Assert.Equal("Msg one", xmlRecords[0].CmTrace!.Message);
+        Assert.Equal("Msg one", legacyRecords[0].CmTrace!.Message);
+        Assert.Equal(LogSeverity.Error, xmlRecords[1].CmTrace!.Severity);
+        Assert.Equal(LogSeverity.Info, legacyRecords[1].CmTrace!.Severity);
     }
 
     [Fact]

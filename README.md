@@ -93,18 +93,24 @@ LogViewer.App.exe C:\logs\app.log
 ## Feature overview
 
 - **CMTrace + plain text**: Files are auto-detected as CMTrace or treated as plain text (one record
-  per line) otherwise. Two CMTrace variants are supported:
-  - The modern XML-attribute format: `<![LOG[message]LOG]!><time="..." date="..." component="..." ...>`.
-  - The older/legacy format still emitted by many SCCM/ccmexec client logs, where each line ends with
-    trailing metadata instead of starting with a tag:
+  per line) otherwise. Two CMTrace variants are supported, with equal priority (neither is treated as
+  a deprecated/secondary fallback of the other):
+  - The XML-attribute format: `<![LOG[message]LOG]!><time="..." date="..." component="..." ...>`.
+  - The trailing-metadata format still actively used by many current SCCM/ConfigMgr client components
+    (e.g. `ccmexec.log`), where each line ends with metadata instead of starting with a tag:
     `message~  $$<Component><MM-dd-yyyy HH:mm:ss.fff+/-offsetMinutes><thread=1234 (0x4D2)>`. This
-    variant has no severity/type field, so parsed rows default to Info severity. Detection requires
-    every sampled non-empty line to match the pattern, to avoid misclassifying plain text files.
+    variant has no severity/type field, so parsed rows default to Info severity.
+
+  Detection and parsing both happen **per record**, not just once for the whole file: each individual
+  record is independently checked against both variants, so a file that mixes the two (or interleaves
+  them) still gets every record parsed correctly according to which variant it actually is. The
+  file-wide format shown in the status bar (`CmTrace` / `CmTraceLegacy` / `CmTraceMixed` / `PlainText`)
+  is only a best-effort summary label for the whole file and never gates per-record parsing.
 
   A toolbar toggle switches each tab between a **Raw** view (original line/record text) and a
   **Parsed** view (Timestamp / Component / Severity / Thread / Message columns) for CMTrace files
-  (either variant). Both views read from the same underlying record data, so filter matching is
-  identical regardless of which view is displayed.
+  (either variant, or both in a mixed file). Both views read from the same underlying record data, so
+  filter matching is identical regardless of which view is displayed.
 - **Three independent filters** (Highlight/Hide/Filter), combined as Filter → Hide → Highlight, as
   described above.
 - **Multi-file tabs**: one tab per open file; open several at once via drag-and-drop from Explorer, the

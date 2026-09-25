@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{71F5D53B
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogViewer.Core.Tests", "tests\LogViewer.Core.Tests\LogViewer.Core.Tests.csproj", "{AF0A6C07-1C15-4747-B5A9-F4CC5DD8867D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogViewer.App.Tests", "tests\LogViewer.App.Tests\LogViewer.App.Tests.csproj", "{45680250-5F12-41F5-9BA5-59714CFB0691}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -34,10 +36,15 @@ Global
 		{AF0A6C07-1C15-4747-B5A9-F4CC5DD8867D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AF0A6C07-1C15-4747-B5A9-F4CC5DD8867D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AF0A6C07-1C15-4747-B5A9-F4CC5DD8867D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{45680250-5F12-41F5-9BA5-59714CFB0691}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45680250-5F12-41F5-9BA5-59714CFB0691}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45680250-5F12-41F5-9BA5-59714CFB0691}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45680250-5F12-41F5-9BA5-59714CFB0691}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{D482CF68-DE9F-48E5-9C21-F5ECE431999E} = {E16A9E87-916C-41D4-B67C-251BBE2CAEE6}
 		{2B724E0E-2918-4D1B-B6CC-6B7D0BD73385} = {E16A9E87-916C-41D4-B67C-251BBE2CAEE6}
 		{AF0A6C07-1C15-4747-B5A9-F4CC5DD8867D} = {71F5D53B-F393-4B8A-B30F-AA92F509FA92}
+		{45680250-5F12-41F5-9BA5-59714CFB0691} = {71F5D53B-F393-4B8A-B30F-AA92F509FA92}
 	EndGlobalSection
 EndGlobal

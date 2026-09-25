@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -160,7 +161,27 @@ public partial class LogTabView : UserControl
             return;
         }
 
-        RowList.ItemsSource = _viewModel.LoadWindow(_topIndex, _windowSize);
+        // Preserve the user's row selection across window reloads (which happen on every background
+        // poll tick, even while paused/Follow is off, since ingestion never stops). Without this, a
+        // multi-select-then-Ctrl+C copy of older content could be wiped out by an in-flight reload
+        // triggered by unrelated new data arriving at the tail of the file.
+        var previousSelection = RowList.SelectedItems.OfType<RecordRowViewModel>()
+            .Select(r => r.Index)
+            .ToHashSet();
+
+        var rows = _viewModel.LoadWindow(_topIndex, _windowSize);
+        RowList.ItemsSource = rows;
+
+        if (previousSelection.Count > 0)
+        {
+            foreach (var row in rows)
+            {
+                if (previousSelection.Contains(row.Index))
+                {
+                    RowList.SelectedItems.Add(row);
+                }
+            }
+        }
     }
 
     private void VirtualScrollBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -183,5 +204,34 @@ public partial class LogTabView : UserControl
         int delta = e.Delta > 0 ? -3 : 3;
         double newValue = Math.Clamp(VirtualScrollBar.Value + delta, VirtualScrollBar.Minimum, VirtualScrollBar.Maximum);
         VirtualScrollBar.Value = newValue;
+    }
+
+    private void SelectAllCommand_Executed(object sender, ExecutedRoutedEventArgs e)
+    {
+        RowList.SelectAll();
+    }
+
+    private void CopyCommand_CanExecute(object sender, CanExecuteRoutedEventArgs e)
+    {
+        e.CanExecute = RowList.SelectedItems.Count > 0;
+    }
+
+    private void CopyCommand_Executed(object sender, ExecutedRoutedEventArgs e)
+    {
+        string text = RowCopyHelper.BuildClipboardText(RowList.SelectedItems.OfType<RecordRowViewModel>());
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(text);
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            // Another process briefly held the clipboard open; silently ignore, matching typical
+            // Windows app behavior for transient clipboard-lock failures on Ctrl+C.
+        }
     }
 }

@@ -66,7 +66,21 @@
             <ListView x:Name="RowList" Grid.Column="0" ScrollViewer.VerticalScrollBarVisibility="Disabled"
                       ScrollViewer.CanContentScroll="False" PreviewMouseWheel="RowList_PreviewMouseWheel"
                       FontFamily="Consolas" FontSize="12" SizeChanged="RowList_SizeChanged"
-                      View="{StaticResource ParsedGridView}">
+                      View="{StaticResource ParsedGridView}" SelectionMode="Extended">
+                <ListView.InputBindings>
+                    <KeyBinding Key="C" Modifiers="Ctrl" Command="ApplicationCommands.Copy"/>
+                    <KeyBinding Key="A" Modifiers="Ctrl" Command="ApplicationCommands.SelectAll"/>
+                </ListView.InputBindings>
+                <ListView.CommandBindings>
+                    <CommandBinding Command="ApplicationCommands.Copy" Executed="CopyCommand_Executed" CanExecute="CopyCommand_CanExecute"/>
+                    <CommandBinding Command="ApplicationCommands.SelectAll" Executed="SelectAllCommand_Executed"/>
+                </ListView.CommandBindings>
+                <ListView.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Copy" Command="ApplicationCommands.Copy"
+                                  ToolTip="Copy the selected rows' original raw log text to the clipboard, one line per row."/>
+                    </ContextMenu>
+                </ListView.ContextMenu>
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="Background" Value="{Binding RowBackground}"/>

@@ -11,18 +11,19 @@ src/
                        file indexing, filter engine, CLI argument parsing. No UI dependencies.
   LogViewer.App/       WPF application (views, view models, App/MainWindow startup, drag & drop).
 tests/
-  LogViewer.Core.Tests/  xUnit tests for LogViewer.Core (37 tests).
+  LogViewer.Core.Tests/  xUnit tests for LogViewer.Core (44 tests).
+  LogViewer.App.Tests/   xUnit tests for LogViewer.App view-model logic (6 tests; requires Windows/WPF).
 ```
 
 ## Building
 
 Requires the **.NET 8 SDK** and, on Windows, the WPF desktop workload (installed automatically with
-the SDK via `Microsoft.WindowsDesktop.App`). Only `LogViewer.App` needs Windows; `LogViewer.Core` and
-its tests are plain .NET and can be built/tested on any OS.
+the SDK via `Microsoft.WindowsDesktop.App`). `LogViewer.Core` and `LogViewer.Core.Tests` are plain
+.NET and can be built/tested on any OS; `LogViewer.App` and `LogViewer.App.Tests` require Windows.
 
 ```powershell
 dotnet build LogViewer.sln
-dotnet test tests/LogViewer.Core.Tests/LogViewer.Core.Tests.csproj
+dotnet test LogViewer.sln
 ```
 
 ## Running
@@ -123,6 +124,14 @@ LogViewer.App.exe C:\logs\app.log
   full re-scan from the start (see "Known limitations" for the heuristic's edge cases); a still-growing
   final record (e.g. mid-write CMTrace entry) is shown immediately and grows in place as more of it is
   written, without being double-counted once it's followed by a new record.
+- **Copy rows to clipboard**: select one or more rows (click, shift-click for a range, ctrl-click to
+  add/remove individual rows, or Ctrl+A for all currently loaded rows), then press **Ctrl+C** or use
+  **right-click → Copy**. The clipboard always receives the original raw source-file text for the
+  selected rows (one per line, in file order, newline-separated) — never the parsed-columns
+  representation — regardless of whether Raw or Parsed view is active, so a copy always matches what is
+  actually in the log file, including full multi-line CMTrace records. Works while Follow is paused
+  (the primary use case for reviewing/copying older content) without being disturbed by ongoing
+  background ingestion, and while Follow is on.
 
 ## Large file design (bounded memory)
 
@@ -195,11 +204,17 @@ file size:
 
 ## Tests
 
-`tests/LogViewer.Core.Tests` covers: CMTrace parsing, the Filter/Hide/Highlight combination logic,
-command-line argument parsing, and - most importantly - `LogFileIndex`/`FilteredRecordIndex` behavior:
-incremental growth, truncation/rotation resets, UTF-16 handling, bounded checkpoint counts on a
-20,000-line file, and incremental (batch-limited) filtered match building. All 37 tests pass
-(`dotnet test tests/LogViewer.Core.Tests/LogViewer.Core.Tests.csproj`).
+`tests/LogViewer.Core.Tests` covers: CMTrace parsing (both the modern XML-attribute format and the
+legacy SCCM/ccmexec trailing-metadata format), the Filter/Hide/Highlight combination logic, command-line
+argument parsing, and - most importantly - `LogFileIndex`/`FilteredRecordIndex` behavior: incremental
+growth, truncation/rotation resets, UTF-16 handling, bounded checkpoint counts on a 20,000-line file,
+and incremental (batch-limited) filtered match building. All 44 tests pass.
+
+`tests/LogViewer.App.Tests` covers `RowCopyHelper` (the Copy-to-clipboard logic): joining selected
+rows' raw text in file order regardless of selection/click order, always using raw text rather than the
+parsed Message column, and preserving full multi-line raw record content. All 6 tests pass.
+
+Run everything with `dotnet test LogViewer.sln`.
 
 The WPF app itself was manually smoke-tested: launched with generated sample plain-text and CMTrace
 log files via `-File`/`-Highlight`, confirmed it starts without exceptions and stays responsive

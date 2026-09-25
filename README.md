@@ -91,11 +91,19 @@ LogViewer.App.exe C:\logs\app.log
 
 ## Feature overview
 
-- **CMTrace + plain text**: Files are auto-detected as CMTrace (`<![LOG[...]LOG]!><...>` records) or
-  treated as plain text (one record per line) otherwise. A toolbar toggle switches each tab between a
-  **Raw** view (original line/record text) and a **Parsed** view (Timestamp / Component / Severity /
-  Thread / Message columns) for CMTrace files. Both views read from the same underlying record data,
-  so filter matching is identical regardless of which view is displayed.
+- **CMTrace + plain text**: Files are auto-detected as CMTrace or treated as plain text (one record
+  per line) otherwise. Two CMTrace variants are supported:
+  - The modern XML-attribute format: `<![LOG[message]LOG]!><time="..." date="..." component="..." ...>`.
+  - The older/legacy format still emitted by many SCCM/ccmexec client logs, where each line ends with
+    trailing metadata instead of starting with a tag:
+    `message~  $$<Component><MM-dd-yyyy HH:mm:ss.fff+/-offsetMinutes><thread=1234 (0x4D2)>`. This
+    variant has no severity/type field, so parsed rows default to Info severity. Detection requires
+    every sampled non-empty line to match the pattern, to avoid misclassifying plain text files.
+
+  A toolbar toggle switches each tab between a **Raw** view (original line/record text) and a
+  **Parsed** view (Timestamp / Component / Severity / Thread / Message columns) for CMTrace files
+  (either variant). Both views read from the same underlying record data, so filter matching is
+  identical regardless of which view is displayed.
 - **Three independent filters** (Highlight/Hide/Filter), combined as Filter → Hide → Highlight, as
   described above.
 - **Multi-file tabs**: one tab per open file; open several at once via drag-and-drop from Explorer, the

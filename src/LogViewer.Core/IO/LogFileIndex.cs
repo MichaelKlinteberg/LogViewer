@@ -138,7 +138,8 @@ public sealed class LogFileIndex
         _checkpoints.Add((0, _preambleLength));
 
         // Sample the first handful of lines with the string-based detector (cheap, bounded cost) to
-        // decide whether this file is CMTrace-formatted or plain text.
+        // decide whether this file is CMTrace-formatted (modern XML-tag or legacy trailing-metadata
+        // variant) or plain text.
         stream.Seek(_preambleLength, SeekOrigin.Begin);
         var sampleBuffer = new byte[Math.Min(ReadBufferSize, Math.Max(0, stream.Length - _preambleLength))];
         int sampleRead = sampleBuffer.Length > 0 ? stream.Read(sampleBuffer, 0, sampleBuffer.Length) : 0;
@@ -146,6 +147,8 @@ public sealed class LogFileIndex
 
         Format = LogFormat.PlainText;
         int checkedLines = 0;
+        int legacyCandidateLines = 0;
+        int legacyMatchLines = 0;
         foreach (var line in lines)
         {
             if (checkedLines++ >= 20)
@@ -159,6 +162,24 @@ public sealed class LogFileIndex
                 Format = LogFormat.CmTrace;
                 break;
             }
+
+            if (text.Length > 0)
+            {
+                legacyCandidateLines++;
+                if (CmTraceParser.IsLegacyRecordLine(text))
+                {
+                    legacyMatchLines++;
+                }
+            }
+        }
+
+        // Legacy CMTrace has no distinctive line-start marker, so instead of matching on the first
+        // sampled line we require *every* sampled non-empty line to match the trailing-metadata
+        // pattern before classifying the whole file as CmTraceLegacy; this avoids misclassifying a
+        // plain text file that merely happens to contain something resembling "$$<...>" once.
+        if (Format == LogFormat.PlainText && legacyCandidateLines > 0 && legacyMatchLines == legacyCandidateLines)
+        {
+            Format = LogFormat.CmTraceLegacy;
         }
     }
 
@@ -188,7 +209,7 @@ public sealed class LogFileIndex
 
             foreach (var line in lines)
             {
-                bool isStart = Format == LogFormat.PlainText || !_hasOpenRecord || HasPrefix(buffer, (int)(line.AbsoluteOffset - readStartOffset), line.LengthExcludingTerminator);
+                bool isStart = Format == LogFormat.PlainText || Format == LogFormat.CmTraceLegacy || !_hasOpenRecord || HasPrefix(buffer, (int)(line.AbsoluteOffset - readStartOffset), line.LengthExcludingTerminator);
 
                 if (isStart)
                 {
@@ -294,7 +315,12 @@ public sealed class LogFileIndex
             {
                 var bytes = accumulator?.ToArray() ?? Array.Empty<byte>();
                 var rawText = _encoding.GetString(bytes);
-                var cmTrace = Format == LogFormat.CmTrace ? CmTraceParser.TryParse(rawText) : null;
+                CmTraceFields? cmTrace = Format switch
+                {
+                    LogFormat.CmTrace => CmTraceParser.TryParse(rawText),
+                    LogFormat.CmTraceLegacy => CmTraceParser.TryParseLegacy(rawText),
+                    _ => null,
+                };
                 results.Add(new LogRecord
                 {
                     Index = recordIndex,
@@ -322,7 +348,7 @@ public sealed class LogFileIndex
             foreach (var line in lines)
             {
                 int localOffset = (int)(line.AbsoluteOffset - readCursor);
-                bool isStart = Format == LogFormat.PlainText || !haveOpenRecord || HasPrefix(buffer, localOffset, line.LengthExcludingTerminator);
+                bool isStart = Format == LogFormat.PlainText || Format == LogFormat.CmTraceLegacy || !haveOpenRecord || HasPrefix(buffer, localOffset, line.LengthExcludingTerminator);
 
                 if (isStart)
                 {

@@ -64,4 +64,81 @@ public class CmTraceParserTests
         Assert.NotNull(fields);
         Assert.Contains("line two continuation", fields!.Message);
     }
+
+    // The following lines are copied verbatim from a real ccmexec.log (SCCM client log) that uses
+    // the older/legacy CMTrace format, where each line ends with trailing "$$<Component><timestamp>
+    // <thread=...>" metadata instead of starting with a "<![LOG[" XML tag. Regression coverage for
+    // https://github.com internal bug report: parsed columns (Time/Severity/Component/Thread) were
+    // empty and the metadata leaked into the Message column for this variant.
+    private const string LegacyLineWithTilde =
+        "---> SspiExcludePackage succeeded for .\\Administrator authentication!~  $$<SMS_CLIENT_CONFIG_MANAGER><09-25-2026 15:13:55.938-60><thread=18612 (0x48B4)>";
+
+    private const string LegacyLineWithoutTilde =
+        "Submitted request successfully  $$<SMS_CLIENT_CONFIG_MANAGER><09-25-2026 15:13:57.327-60><thread=19068 (0x4A7C)>";
+
+    private const string LegacyLineWithEmbeddedQuotesAndBackslashes =
+        "---> Attempting to connect to administrative share '\\\\USCHQPR-VPR001.aveva.com\\admin$' using machine account.~  $$<SMS_CLIENT_CONFIG_MANAGER><09-25-2026 15:13:55.968-60><thread=18612 (0x48B4)>";
+
+    [Fact]
+    public void IsLegacyRecordLine_recognizes_trailing_metadata_format()
+    {
+        Assert.True(CmTraceParser.IsLegacyRecordLine(LegacyLineWithTilde.AsSpan()));
+        Assert.True(CmTraceParser.IsLegacyRecordLine(LegacyLineWithoutTilde.AsSpan()));
+        Assert.False(CmTraceParser.IsLegacyRecordLine("plain text line with no metadata".AsSpan()));
+        Assert.False(CmTraceParser.IsLegacyRecordLine(SampleLine.AsSpan()));
+    }
+
+    [Fact]
+    public void TryParseLegacy_extracts_fields_with_trailing_tilde()
+    {
+        var fields = CmTraceParser.TryParseLegacy(LegacyLineWithTilde);
+
+        Assert.NotNull(fields);
+        Assert.Equal("---> SspiExcludePackage succeeded for .\\Administrator authentication!", fields!.Message);
+        Assert.Equal("SMS_CLIENT_CONFIG_MANAGER", fields.Component);
+        Assert.Equal("18612", fields.Thread);
+        Assert.Equal(LogSeverity.Info, fields.Severity);
+        Assert.NotNull(fields.Timestamp);
+        Assert.Equal(2026, fields.Timestamp!.Value.Year);
+        Assert.Equal(9, fields.Timestamp.Value.Month);
+        Assert.Equal(25, fields.Timestamp.Value.Day);
+        Assert.Equal(15, fields.Timestamp.Value.Hour);
+        Assert.Equal(13, fields.Timestamp.Value.Minute);
+        Assert.Equal(55, fields.Timestamp.Value.Second);
+        Assert.Equal(938, fields.Timestamp.Value.Millisecond);
+        Assert.Equal(TimeSpan.FromMinutes(-60), fields.Timestamp.Value.Offset);
+    }
+
+    [Fact]
+    public void TryParseLegacy_extracts_fields_without_trailing_tilde()
+    {
+        var fields = CmTraceParser.TryParseLegacy(LegacyLineWithoutTilde);
+
+        Assert.NotNull(fields);
+        Assert.Equal("Submitted request successfully", fields!.Message);
+        Assert.Equal("SMS_CLIENT_CONFIG_MANAGER", fields.Component);
+        Assert.Equal("19068", fields.Thread);
+        Assert.NotNull(fields.Timestamp);
+        Assert.Equal(57, fields.Timestamp!.Value.Second);
+    }
+
+    [Fact]
+    public void TryParseLegacy_preserves_message_content_with_quotes_backslashes_and_arrows()
+    {
+        var fields = CmTraceParser.TryParseLegacy(LegacyLineWithEmbeddedQuotesAndBackslashes);
+
+        Assert.NotNull(fields);
+        Assert.Equal(
+            "---> Attempting to connect to administrative share '\\\\USCHQPR-VPR001.aveva.com\\admin$' using machine account.",
+            fields!.Message);
+        Assert.Equal("SMS_CLIENT_CONFIG_MANAGER", fields.Component);
+        Assert.Equal("18612", fields.Thread);
+    }
+
+    [Fact]
+    public void TryParseLegacy_returns_null_for_non_matching_text()
+    {
+        Assert.Null(CmTraceParser.TryParseLegacy("just a regular log line, nothing special"));
+        Assert.Null(CmTraceParser.TryParseLegacy(SampleLine));
+    }
 }

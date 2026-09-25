@@ -4,7 +4,17 @@ namespace LogViewer.Core.IO;
 public enum LogFormat
 {
     PlainText,
+
+    /// <summary>The modern CMTrace format: <c>&lt;![LOG[message]LOG]!&gt;&lt;time="..." date="..." ...&gt;</c>.</summary>
     CmTrace,
+
+    /// <summary>
+    /// The older/legacy CMTrace format used by many SCCM/ccmexec client logs, where each line ends
+    /// with trailing metadata instead of starting with an XML-like tag:
+    /// <c>message~  $$&lt;Component&gt;&lt;MM-dd-yyyy HH:mm:ss.fff+/-offsetMinutes&gt;&lt;thread=1234 (0x4D2)&gt;</c>.
+    /// Unlike <see cref="CmTrace"/>, records in this format are always exactly one physical line.
+    /// </summary>
+    CmTraceLegacy,
 }
 
 /// <summary>Outcome of a call to <see cref="LogFileIndex.Refresh"/>.</summary>

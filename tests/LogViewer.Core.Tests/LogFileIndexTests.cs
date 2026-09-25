@@ -68,6 +68,55 @@ public class LogFileIndexTests : IDisposable
     }
 
     [Fact]
+    public void Detects_legacy_cmtrace_format_and_extracts_fields()
+    {
+        var path = NewPath("legacy-cmtrace.log");
+        // Lines copied verbatim (structurally) from a real SCCM/ccmexec client log using the older
+        // CMTrace variant, which has no leading marker and instead ends each line with trailing
+        // "$$<Component><timestamp><thread=...>" metadata.
+        var content =
+            "---> SspiExcludePackage succeeded for .\\Administrator authentication!~  $$<SMS_CLIENT_CONFIG_MANAGER><09-25-2026 15:13:55.938-60><thread=18612 (0x48B4)>\r\n" +
+            "Submitted request successfully  $$<SMS_CLIENT_CONFIG_MANAGER><09-25-2026 15:13:57.327-60><thread=19068 (0x4A7C)>\r\n";
+        File.WriteAllText(path, content, new UTF8Encoding(false));
+
+        var index = new LogFileIndex(path);
+        index.Refresh();
+
+        Assert.Equal(LogFormat.CmTraceLegacy, index.Format);
+        Assert.Equal(2, index.TotalRecordCount);
+
+        var records = index.GetRecords(0, 2);
+        Assert.NotNull(records[0].CmTrace);
+        Assert.Equal("SMS_CLIENT_CONFIG_MANAGER", records[0].CmTrace!.Component);
+        Assert.Equal("18612", records[0].CmTrace!.Thread);
+        Assert.Equal("---> SspiExcludePackage succeeded for .\\Administrator authentication!", records[0].CmTrace!.Message);
+        Assert.NotNull(records[0].CmTrace!.Timestamp);
+
+        Assert.NotNull(records[1].CmTrace);
+        Assert.Equal("19068", records[1].CmTrace!.Thread);
+        Assert.Equal("Submitted request successfully", records[1].CmTrace!.Message);
+    }
+
+    [Fact]
+    public void Falls_back_to_plain_text_when_not_all_sampled_lines_match_legacy_cmtrace_pattern()
+    {
+        var path = NewPath("mixed.log");
+        // A file that contains one legacy-CMTrace-looking line among otherwise ordinary plain text
+        // must NOT be misclassified as CmTraceLegacy (conservative detection: all sampled non-empty
+        // lines must match).
+        var content =
+            "just a regular log line\r\n" +
+            "Submitted request successfully  $$<SMS_CLIENT_CONFIG_MANAGER><09-25-2026 15:13:57.327-60><thread=19068 (0x4A7C)>\r\n" +
+            "another regular line\r\n";
+        File.WriteAllText(path, content, new UTF8Encoding(false));
+
+        var index = new LogFileIndex(path);
+        index.Refresh();
+
+        Assert.Equal(LogFormat.PlainText, index.Format);
+    }
+
+    [Fact]
     public void Live_growth_is_picked_up_incrementally()
     {
         var path = NewPath("growing.log");

@@ -1,0 +1,90 @@
+<UserControl x:Class="LogViewer.App.Views.LogTabView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:conv="clr-namespace:LogViewer.App.Converters"
+             mc:Ignorable="d"
+             d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+        <GridView x:Key="ParsedGridView">
+            <GridViewColumn Header="#" Width="70" DisplayMemberBinding="{Binding Index}"/>
+            <GridViewColumn Header="Time" Width="140" DisplayMemberBinding="{Binding TimestampText}"/>
+            <GridViewColumn Header="Severity" Width="70" DisplayMemberBinding="{Binding SeverityText}"/>
+            <GridViewColumn Header="Component" Width="140" DisplayMemberBinding="{Binding Component}"/>
+            <GridViewColumn Header="Thread" Width="60" DisplayMemberBinding="{Binding Thread}"/>
+            <GridViewColumn Header="Message" Width="900" DisplayMemberBinding="{Binding Message}"/>
+        </GridView>
+        <GridView x:Key="RawGridView">
+            <GridViewColumn Header="#" Width="70" DisplayMemberBinding="{Binding Index}"/>
+            <GridViewColumn Header="Raw text" Width="1300" DisplayMemberBinding="{Binding RawText}"/>
+        </GridView>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Filter toolbar -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="6">
+            <TextBlock Text="Highlight:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="HighlightBox" Width="160" Margin="0,0,12,0" Text="{Binding HighlightText, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Rows containing this text (case-insensitive) are highlighted. Does not hide anything."/>
+            <TextBlock Text="Hide:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="HideBox" Width="160" Margin="0,0,12,0" Text="{Binding HideText, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Rows containing this text (case-insensitive) are removed from view."/>
+            <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="FilterBox" Width="160" Margin="0,0,12,0" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Only rows containing this text (case-insensitive) are shown."/>
+            <ToggleButton Content="Parsed columns" IsChecked="{Binding IsRawView, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,0"
+                          ToolTip="Toggle between raw text and parsed CMTrace columns (timestamp/component/severity/...)."/>
+            <ToggleButton Content="Follow" IsChecked="{Binding IsFollowing}" Margin="0,0,8,0"
+                          ToolTip="When checked, the view auto-scrolls to newest records as they arrive. Uncheck to read older content without stopping ingestion."/>
+        </StackPanel>
+
+        <!-- Locked-file error banner -->
+        <Border Grid.Row="1" Background="#FFF3CD" BorderBrush="#FFECB5" BorderThickness="0,1,0,1" Padding="8"
+                Visibility="{Binding IsLocked, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <DockPanel>
+                <Button Content="Retry" Command="{Binding RetryCommand}" DockPanel.Dock="Right" Padding="10,2"/>
+                <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Row list + custom virtual scrollbar -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <ListView x:Name="RowList" Grid.Column="0" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                      ScrollViewer.CanContentScroll="False" PreviewMouseWheel="RowList_PreviewMouseWheel"
+                      FontFamily="Consolas" FontSize="12" SizeChanged="RowList_SizeChanged"
+                      View="{StaticResource ParsedGridView}">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="Background" Value="{Binding RowBackground}"/>
+                        <Setter Property="Foreground" Value="{Binding RowForeground}"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
+            </ListView>
+
+            <ScrollBar x:Name="VirtualScrollBar" Grid.Column="1" Orientation="Vertical"
+                       Minimum="0" ValueChanged="VirtualScrollBar_ValueChanged"/>
+        </Grid>
+
+        <!-- Status bar -->
+        <StatusBar Grid.Row="3">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusText}"/>
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</UserControl>

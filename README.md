@@ -33,6 +33,19 @@ dotnet run --project src/LogViewer.App/LogViewer.App.csproj
 
 or run the built executable directly: `src/LogViewer.App/bin/Debug/net8.0-windows/LogViewer.App.exe`.
 
+### Publishing a single portable .exe
+
+To produce one self-contained `LogViewer.App.exe` (no separate .dll files, no .NET runtime needed on
+the target machine) for distribution:
+
+```powershell
+dotnet publish src/LogViewer.App/LogViewer.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=none -o publish/LogViewer
+```
+
+This produces `publish/LogViewer/LogViewer.App.exe` (~68 MB, since it bundles the .NET 8 runtime) that
+runs standalone on any 64-bit Windows machine. Omit `-p:DebugType=none` to keep a `.pdb` alongside it
+for debugging. The `publish/` folder is git-ignored.
+
 You can also open files by:
 - Dragging one or more files from Windows File Explorer onto the window (drops on any part of the
   window are accepted, not just the tab strip).

@@ -10,6 +10,9 @@ obj/
 TestResults/
 *.trx
 
+## Publish output
+publish/
+
 ## Sample/manual test artifacts
 .sample-logs/
 
